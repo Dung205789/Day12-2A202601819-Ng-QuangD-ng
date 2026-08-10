@@ -10,8 +10,8 @@
 
 | Mục | Nội dung |
 |-----|----------|
-| Họ và tên | (điền họ tên) |
-| Mã học viên | (điền mã học viên) |
+| Họ và tên | Ngô Quang Dũng |
+| Mã học viên | 2A202601819 |
 | Repo | https://github.com/Dung205789/Day12-2A202601819-Ng-QuangD-ng |
 
 ## Service
