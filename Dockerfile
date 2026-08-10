@@ -21,14 +21,23 @@
 #            docker images day12-agent:prod     # xem dung lượng
 # ═══════════════════════════════════════════════════════════════════
 
-FROM python:3.11
-
+# ── Stage 1: builder — cài dependency, mang theo compiler cũng không sao
+#    vì stage này bị vứt đi, không nằm trong image cuối.
+FROM python:3.11-slim AS builder
 WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-COPY . .
+# ── Stage 2: runtime — chỉ lấy kết quả đã cài từ builder sang
+FROM python:3.11-slim AS runtime
+WORKDIR /app
+COPY --from=builder /install /usr/local
+COPY app ./app
+COPY utils ./utils
+RUN useradd --create-home --uid 10001 appuser
+USER appuser
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.getenv('PORT','8000')).read()" || exit 1
 
-RUN pip install -r requirements.txt
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
 
-EXPOSE 8000
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
