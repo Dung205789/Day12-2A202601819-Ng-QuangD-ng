@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Chạy test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Cài dependency
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Chạy pytest
+        run: pytest tests/ --ignore=tests/test_cp5.py -v
+
+  build:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build thử image
+        run: docker build -t day12-agent:${{ github.sha }} .
+      - name: Kiểm tra dung lượng image dưới 500MB
+        run: |
+          SIZE=$(docker image inspect day12-agent:${{ github.sha }} --format '{{.Size}}')
+          echo "Image size: $((SIZE / 1024 / 1024))MB"
+          test "$SIZE" -lt 524288000
+
+  deploy:
+    name: Deploy lên production
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gọi deploy hook của platform
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "Chưa cấu hình RAILWAY_TOKEN trong repo secrets — bỏ qua deploy."
+            exit 0
+          fi
+          npm install -g @railway/cli
+          railway up --service agent --detach
